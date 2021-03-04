@@ -4,7 +4,7 @@
 
 package limits
 
-// No way to reference macros in Go so have to redefine
+// Cannot import values from C without throwing away the const
 const (
 	// KvsCountMax is the maximum number of KVS's contained within one KVDB
 	KvsCountMax   = 256

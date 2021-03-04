@@ -13,7 +13,7 @@ import (
 
 const (
 	kvdbName        = "hse-go-test"
-	kvdbTestKvsName = "hse-go-kvdb-test-kvs"
+	kvdbTestKvsName = "kvdb-test"
 )
 
 var kvdb *Kvdb
@@ -42,7 +42,7 @@ func TestMain(t *testing.M) {
 	KvdbInit()
 	defer KvdbFini()
 
-	p, err := ParamsCreate()
+	p, err := NewParams()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create params: %s\n", err)
 		os.Exit(1)

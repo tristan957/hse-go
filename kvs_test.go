@@ -15,11 +15,11 @@ const (
 var kvsTestKvs *Kvs
 
 func TestKvsKeyOperations(t *testing.T) {
-	if err := kvsTestKvs.Put([]byte("key"), []byte("value")); err != nil {
+	if err := kvsTestKvs.Put([]byte("key"), []byte("value"), nil); err != nil {
 		t.Fatalf("failed to put key: %s", err)
 	}
 
-	value, _, err := kvsTestKvs.Get([]byte("key"))
+	value, _, err := kvsTestKvs.Get([]byte("key"), nil)
 	if err != nil {
 		t.Fatalf("failed to get key: %s", err)
 	}
@@ -28,18 +28,18 @@ func TestKvsKeyOperations(t *testing.T) {
 		t.Fatalf("value that was retrieved does not match what was inserted (%s)", value)
 	}
 
-	if err = kvsTestKvs.Delete([]byte("key")); err != nil {
+	if err = kvsTestKvs.Delete([]byte("key"), nil); err != nil {
 		t.Fatalf("failed to delete key: %s", err)
 	}
 
-	kvsTestKvs.Put([]byte("key1"), []byte("value1"))
-	kvsTestKvs.Put([]byte("key2"), []byte("value2"))
+	kvsTestKvs.Put([]byte("key1"), []byte("value1"), nil)
+	kvsTestKvs.Put([]byte("key2"), []byte("value2"), nil)
 
-	if _, err = kvsTestKvs.PrefixDelete([]byte("key")); err != nil {
+	if _, err = kvsTestKvs.PrefixDelete([]byte("key"), nil); err != nil {
 		t.Fatalf("failed to delete key* prefix: %s", err)
 	}
 
-	value, _, err = kvsTestKvs.Get([]byte("key1"))
+	value, _, err = kvsTestKvs.Get([]byte("key1"), nil)
 	if err != nil {
 		t.Fatalf("failed to get key1: %s", err)
 	}
@@ -47,7 +47,7 @@ func TestKvsKeyOperations(t *testing.T) {
 		t.Fatalf("value1 was not deleted in prefix delete: %s", err)
 	}
 
-	value, _, err = kvsTestKvs.Get([]byte("key2"))
+	value, _, err = kvsTestKvs.Get([]byte("key2"), nil)
 	if err != nil {
 		t.Fatalf("failed to get key2: %s", err)
 	}

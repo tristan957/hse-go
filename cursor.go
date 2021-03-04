@@ -4,20 +4,29 @@
 
 package hse
 
-// #include <hse/hse.h>
+/*
+#include <hse/hse.h>
+*/
 import "C"
 import (
-	"io"
 	"unsafe"
 
 	"github.com/hse-project/hse-go/limits"
 )
 
-type KvsCursor struct {
+type Cursor struct {
 	impl *C.struct_hse_kvs_cursor
+	eof  bool
 }
 
-func (c *KvsCursor) Update() error {
+type CursorOptions struct {
+	Reverse    bool
+	StaticView bool
+	BindTxn    bool
+	Txn        *Transaction
+}
+
+func (c *Cursor) Update(options *CursorOptions) error {
 	err := C.hse_kvs_cursor_update(c.impl, nil)
 	if err != 0 {
 		return hseErrToErrno(err)
@@ -26,7 +35,7 @@ func (c *KvsCursor) Update() error {
 	return nil
 }
 
-func (c *KvsCursor) Seek(key []byte) ([]byte, error) {
+func (c *Cursor) Seek(key []byte) ([]byte, error) {
 	var keyPtr unsafe.Pointer
 	var found unsafe.Pointer
 	var foundLen C.size_t
@@ -47,7 +56,7 @@ func (c *KvsCursor) Seek(key []byte) ([]byte, error) {
 	return (*[limits.KvsVLenMax]byte)(found)[:foundLen:foundLen], nil
 }
 
-func (c *KvsCursor) SeekRange(filtMin []byte, filtMax []byte) ([]byte, error) {
+func (c *Cursor) SeekRange(filtMin []byte, filtMax []byte) ([]byte, error) {
 	var filtMinPtr unsafe.Pointer
 	var filtMaxPtr unsafe.Pointer
 	var found unsafe.Pointer
@@ -72,7 +81,7 @@ func (c *KvsCursor) SeekRange(filtMin []byte, filtMax []byte) ([]byte, error) {
 	return (*[limits.KvsVLenMax]byte)(found)[:foundLen:foundLen], nil
 }
 
-func (c *KvsCursor) Read() ([]byte, []byte, error) {
+func (c *Cursor) Read() ([]byte, []byte, error) {
 	var keyPtr unsafe.Pointer
 	var keyLen C.size_t
 	var valuePtr unsafe.Pointer
@@ -94,14 +103,16 @@ func (c *KvsCursor) Read() ([]byte, []byte, error) {
 		value = (*[limits.KvsVLenMax]byte)(valuePtr)[:valueLen:valueLen]
 	}
 
+	c.eof = bool(eof)
+
 	if eof {
-		return key, value, io.EOF
+		return key, value, nil
 	}
 
 	return key, value, nil
 }
 
-func (c *KvsCursor) Destroy() error {
+func (c *Cursor) Destroy() error {
 	if c.impl == nil {
 		return nil
 	}
@@ -114,4 +125,9 @@ func (c *KvsCursor) Destroy() error {
 	c.impl = nil
 
 	return nil
+}
+
+// Eof returns whether or not the cursor is at EOF
+func (c *Cursor) Eof() bool {
+	return c.eof
 }

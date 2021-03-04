@@ -5,7 +5,6 @@
 package hse
 
 /*
-#cgo LDFLAGS: -lhse_kvdb
 #include <hse/hse.h>
 */
 import "C"

@@ -9,7 +9,7 @@ import (
 )
 
 func TestGetSet(t *testing.T) {
-	p, err := ParamsCreate()
+	p, err := NewParams()
 	defer p.Destroy()
 	if err != nil {
 		t.Fatalf("failed to create params object: %s", err)
@@ -23,7 +23,7 @@ func TestGetSet(t *testing.T) {
 }
 
 func TestFromString(t *testing.T) {
-	p, err := ParamsCreate()
+	p, err := NewParams()
 	defer p.Destroy()
 	if err != nil {
 		t.Fatalf("failed to create params object: %s", err)
@@ -44,13 +44,13 @@ kvs:
 }
 
 func TestFromFile(t *testing.T) {
-	p, err := ParamsCreate()
+	p, err := NewParams()
 	defer p.Destroy()
 	if err != nil {
 		t.Fatalf("failed to create params object: %s", err)
 	}
 
-	if err := p.FromFile("test/config.yaml"); err != nil {
+	if err := p.FromFile("testdata/config_test.yaml"); err != nil {
 		t.Fatalf("failed to set params from file: %s", err)
 	}
 

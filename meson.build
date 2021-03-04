@@ -111,6 +111,7 @@ if get_option('tests')
         depends: [
             hse_go,
         ],
+        suite: ['unit'],
         workdir: meson.project_source_root(),
         is_parallel: false,
         env: cgo_env,

@@ -38,7 +38,6 @@ else
         hse_proj = subproject(
             'hse',
             default_options: [
-                'b_ndebug=true',
                 'buildtype=release',
                 'default_library=shared',
                 'cli=false',

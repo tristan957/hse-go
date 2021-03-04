@@ -39,7 +39,6 @@ else
             'hse',
             default_options: [
                 'buildtype=release',
-                'default_library=shared',
                 'cli=false',
                 'samples=false',
                 'tests=false',

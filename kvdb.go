@@ -128,7 +128,7 @@ func (k *Kvdb) Close() error {
 // KvsMake creates a new Kvs within the referenced Kvdb
 //
 // If the KVS will store multi-segment keys then the parameter "pfx_len" should
-// be set to the desired key prefix length - see hse_params_set() and related
+// be set to the desired key prefix length - see Params.Set() and related
 // functions below. Otherwise the param should be set to 0 (the default). An
 // error will result if there is already a KVS with the given name. This
 // function is not thread safe.

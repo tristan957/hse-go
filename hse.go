@@ -11,9 +11,12 @@ import "C"
 import "syscall"
 
 var (
+	// KvdbVersionString is a human readable version string of HSE
 	KvdbVersionString string
-	KvdbVersionTag    string
-	KvdbVersionSHA    string
+	// KvdbVersionTag is the current Git tag of HSE
+	KvdbVersionTag string
+	// KvdbVersionSHA is the current Git SHA of HSE
+	KvdbVersionSHA string
 )
 
 func init() {
@@ -22,7 +25,7 @@ func init() {
 	KvdbVersionSHA = C.GoString(C.hse_kvdb_version_sha())
 }
 
-// hseErrToErrno converts an hse_err_t to an errno
+// hseErrToErrno converts an hse_err_t to a syscall.Errno
 func hseErrToErrno(err C.ulong) error {
 	return syscall.Errno(C.hse_err_to_errno(err))
 }

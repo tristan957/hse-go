@@ -43,6 +43,10 @@ type DeleteOptions struct {
 	Txn *Transaction
 }
 
+// Close closes an open KVS
+//
+// No client thread may enter the HSE Kvdb API with the referenced Kvs after this
+// function starts. This function is not thread safe.
 func (k *Kvs) Close() error {
 	if k.impl == nil {
 		return nil
@@ -58,6 +62,20 @@ func (k *Kvs) Close() error {
 	return nil
 }
 
+// Put places a KV pair into a Kvs
+//
+// If the key already exists in the Kvs then the value is effectively overwritten. The
+// key length must be in the range [1, HSE_KVS_KLEN_MAX] while the value length must be
+// in the range [0, HSE_KVS_VLEN_MAX]. See the section on transactions for information
+// on how puts within transactions are handled. This function is thread safe.
+//
+// The HSE Kvdb attempts to maintain reasonable QoS and for high-throughput clients this
+// results in very short sleep's being inserted into the put path. For some kinds of
+// data (e.g., control metadata) the client may wish to not experience that delay. For
+// relatively low data rate uses, the caller can set the Priority flag for a PutOptions object.
+// Care should be taken when doing so to ensure that the system does not become overrun. As a rough
+// approximation, doing 1M priority puts per second marked as PRIORITY is likely an issue. On the
+// other hand, doing 1K small puts per second marked as PRIORITY is almost certainly fine.
 func (k *Kvs) Put(key, value []byte, options *PutOptions) error {
 	var keyPtr unsafe.Pointer
 	var valuePtr unsafe.Pointer
@@ -77,6 +95,13 @@ func (k *Kvs) Put(key, value []byte, options *PutOptions) error {
 	return nil
 }
 
+// Get retrieves the value for a given key from Kvs
+//
+// If the key exists in the Kvs then the referent of "found" is set to true. If the
+// caller's value buffer is large enough then the data will be returned. Regardless, the
+// actual length of the value is returned . See the section on transactions for
+// information on how gets within transactions are handled. This function is thread
+// safe.
 func (k *Kvs) Get(key []byte, options *GetOptions) ([]byte, uint, error) {
 	var buf []byte
 	var keyPtr unsafe.Pointer
@@ -110,6 +135,11 @@ func (k *Kvs) Get(key []byte, options *GetOptions) ([]byte, uint, error) {
 	return buf[:valueLen:valueLen], uint(valueLen), nil
 }
 
+// Delete deletes the key and its associated value from the Kvs
+//
+// It is not an error if the key does not exist within the Kvs. See the section on
+// transactions for information on how deletes within transactions are handled. This
+// function is thread safe.
 func (k *Kvs) Delete(key []byte, options *DeleteOptions) error {
 	var keyPtr unsafe.Pointer
 
@@ -125,6 +155,19 @@ func (k *Kvs) Delete(key []byte, options *DeleteOptions) error {
 	return nil
 }
 
+// PrefixDelete deletes all KV pairs matching the key prefix from a KVS storing multi-segment keys
+//
+// This interface is used to delete an entire range of multi-segment keys. To do this
+// the caller passes a filter with a length equal to the Kvs' key prefix length. It is
+// not an error if no keys exist matching the filter. If there is a filtered iteration
+// in progress, then that iteration can fail if Kvs.PrefixDelete() is called with
+// a filter matching the iteration. This function is thread safe.
+//
+// If Kvs.PrefixDelete() is called from a transaction context, it affects no
+// key-value mutations that are part of the same transaction. Stated differently, for
+// Kvs commands issued within a transaction, all calls to Kvs.PrefixDelete() are
+// treated as though they were issued serially at the beginning of the transaction
+// regardless of the actual order these commands appeared in.
 func (k *Kvs) PrefixDelete(filt []byte, options *DeleteOptions) (uint, error) {
 	var kvsPfxLen C.size_t
 	var filtPtr unsafe.Pointer

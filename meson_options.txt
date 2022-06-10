@@ -1,6 +1,2 @@
 option('tests', type: 'boolean', value: true,
-	description: 'Configure tests')
-option('hse-include-dir', type: 'string', value: '',
-	description: 'Path to HSE include directory')
-option('hse-lib-dir', type: 'string', value: '',
-	description: 'Path to directory containing libhse-1.so')
+    description: 'Enable tests')

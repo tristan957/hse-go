@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2020 Micron Technology, Inc. All rights reserved.
+// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
 
 package hse
 
@@ -19,29 +19,15 @@ type Kvs struct {
 	impl *C.struct_hse_kvs
 }
 
-// PutOptions are options that can be supplied to a PUT operation
-type PutOptions struct {
-	Priority bool
-	// Transaction context
-	Txn *Transaction
-}
+type DeleteFlags uint
+type GetFlags uint
+type PrefixDeleteFlags uint
+type PutFlags uint
 
-// GetOptions are options that can be supplied to a GET operation
-type GetOptions struct {
-	// Buffer is a user-supplied buffer for storing the value from the GET operation
-	Buffer []byte
-	// Allocate a buffer of size limits.KvsVLenMax and ignore Buffer
-	Allocate bool
-	// Transaction context
-	Txn *Transaction
-}
-
-// DeleteOptions are options that can be supplied to a DELETE operation
-type DeleteOptions struct {
-	Priority bool
-	// Transaction context
-	Txn *Transaction
-}
+var (
+	KVS_PUT_PRIO      PutFlags = C.HSE_KVS_PUT_PRIO
+	KVS_PUT_VCOMP_OFF PutFlags = C.HSE_KVS_PUT_VCOMP_OFF
+)
 
 // Close closes an open KVS
 //
@@ -76,7 +62,7 @@ func (k *Kvs) Close() error {
 // Care should be taken when doing so to ensure that the system does not become overrun. As a rough
 // approximation, doing 1M priority puts per second marked as PRIORITY is likely an issue. On the
 // other hand, doing 1K small puts per second marked as PRIORITY is almost certainly fine.
-func (k *Kvs) Put(key, value []byte, options *PutOptions) error {
+func (k *Kvs) Put(key, value []byte, flags PutFlags) error {
 	var keyPtr unsafe.Pointer
 	var valuePtr unsafe.Pointer
 
@@ -87,7 +73,7 @@ func (k *Kvs) Put(key, value []byte, options *PutOptions) error {
 		valuePtr = unsafe.Pointer(&value[0])
 	}
 
-	err := C.hse_kvs_put(k.impl, nil, keyPtr, C.size_t(len(key)), valuePtr, C.size_t(len(value)))
+	err := C.hse_kvs_put(k.impl, 0, nil, keyPtr, C.size_t(len(key)), valuePtr, C.size_t(len(value)))
 	if err != 0 {
 		return hseErrToErrno(err)
 	}
@@ -102,7 +88,7 @@ func (k *Kvs) Put(key, value []byte, options *PutOptions) error {
 // actual length of the value is returned . See the section on transactions for
 // information on how gets within transactions are handled. This function is thread
 // safe.
-func (k *Kvs) Get(key []byte, options *GetOptions) ([]byte, uint, error) {
+func (k *Kvs) Get(key []byte, flags GetFlags) ([]byte, uint, error) {
 	var buf []byte
 	var keyPtr unsafe.Pointer
 	var bufPtr unsafe.Pointer
@@ -112,18 +98,13 @@ func (k *Kvs) Get(key []byte, options *GetOptions) ([]byte, uint, error) {
 	if key != nil {
 		keyPtr = unsafe.Pointer(&key[0])
 	}
-	if options != nil {
-		if options.Allocate {
-			buf = make([]byte, limits.KvsVLenMax)
-		} else {
-			buf = options.Buffer
-		}
-	}
+
+	buf = make([]byte, limits.KvsVLenMax)
 	if buf != nil {
 		bufPtr = unsafe.Pointer(&buf[0])
 	}
 
-	err := C.hse_kvs_get(k.impl, nil, keyPtr, C.size_t(len(key)), &found, bufPtr, C.size_t(len(buf)), &valueLen)
+	err := C.hse_kvs_get(k.impl, 0, nil, keyPtr, C.size_t(len(key)), &found, bufPtr, C.size_t(len(buf)), &valueLen)
 	if err != 0 {
 		return nil, uint(valueLen), hseErrToErrno(err)
 	}
@@ -140,14 +121,14 @@ func (k *Kvs) Get(key []byte, options *GetOptions) ([]byte, uint, error) {
 // It is not an error if the key does not exist within the Kvs. See the section on
 // transactions for information on how deletes within transactions are handled. This
 // function is thread safe.
-func (k *Kvs) Delete(key []byte, options *DeleteOptions) error {
+func (k *Kvs) Delete(key []byte, flags DeleteFlags) error {
 	var keyPtr unsafe.Pointer
 
 	if key != nil {
 		keyPtr = unsafe.Pointer(&key[0])
 	}
 
-	err := C.hse_kvs_delete(k.impl, nil, keyPtr, C.size_t(len(key)))
+	err := C.hse_kvs_delete(k.impl, C.uint(flags), nil, keyPtr, C.size_t(len(key)))
 	if err != 0 {
 		return hseErrToErrno(err)
 	}
@@ -168,20 +149,19 @@ func (k *Kvs) Delete(key []byte, options *DeleteOptions) error {
 // Kvs commands issued within a transaction, all calls to Kvs.PrefixDelete() are
 // treated as though they were issued serially at the beginning of the transaction
 // regardless of the actual order these commands appeared in.
-func (k *Kvs) PrefixDelete(filt []byte, options *DeleteOptions) (uint, error) {
-	var kvsPfxLen C.size_t
+func (k *Kvs) PrefixDelete(filt []byte, flags PrefixDeleteFlags) error {
 	var filtPtr unsafe.Pointer
 
 	if filt != nil {
 		filtPtr = unsafe.Pointer(&filt[0])
 	}
 
-	err := C.hse_kvs_prefix_delete(k.impl, nil, filtPtr, C.size_t(len(filt)), &kvsPfxLen)
+	err := C.hse_kvs_prefix_delete(k.impl, C.uint(flags), nil, filtPtr, C.size_t(len(filt)))
 	if err != 0 {
-		return uint(kvsPfxLen), hseErrToErrno(err)
+		return hseErrToErrno(err)
 	}
 
-	return uint(kvsPfxLen), nil
+	return nil
 }
 
 // NewCursor creates a cursor used to iterate over a KVS
@@ -232,7 +212,7 @@ func (k *Kvs) PrefixDelete(filt []byte, options *DeleteOptions) (uint, error) {
 // database at the time of the commit or abort. In the commit case, the cursor can see
 // the mutations of the transaction, if any. Note that this will make any other
 // mutations that occurred during the lifespan of the transaction visible as well.
-func (k *Kvs) NewCursor(filt []byte, options *CursorOptions) (*Cursor, error) {
+func (k *Kvs) CreateCursor(filt []byte, flags CursorCreateFlag) (*Cursor, error) {
 	var c Cursor
 	var filtPtr unsafe.Pointer
 
@@ -240,7 +220,7 @@ func (k *Kvs) NewCursor(filt []byte, options *CursorOptions) (*Cursor, error) {
 		filtPtr = unsafe.Pointer(&filt[0])
 	}
 
-	err := C.hse_kvs_cursor_create(k.impl, nil, filtPtr, C.size_t(len(filt)), &c.impl)
+	err := C.hse_kvs_cursor_create(k.impl, C.uint(flags), nil, filtPtr, C.size_t(len(filt)), &c.impl)
 	if err != 0 {
 		return nil, hseErrToErrno(err)
 	}

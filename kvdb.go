@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2020 Micron Technology, Inc. All rights reserved.
+// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
 
 package hse
 
 /*
 #include <hse/hse.h>
+#include <hse/experimental.h>
 */
 import "C"
 import (
@@ -15,7 +16,7 @@ import (
 )
 
 // KvdbCompactFlag constants are flags to set in Kvdb.Compact()
-type KvdbCompactFlag int
+type KvdbCompactFlag uint
 
 const (
 	// CompactCancel will cancel a compaction
@@ -43,39 +44,18 @@ type KvdbCompactStatus struct {
 	Canceled bool
 }
 
-// KvdbInit initializes the HSE KVDB subsystem
-//
-// This function initializes a range of different internal HSE structures. It
-// must be called before any other HSE functions are used. It is not thread safe
-// and is idempotent.
-func KvdbInit() {
-	C.hse_kvdb_init()
-}
-
-// KvdbFini shuts down the HSE KVDB subsystem
-//
-// This function cleanly finalizes a range of different internal HSE structures.
-// It should be called prior to application exit and is not thread safe. After
-// it is invoked (and even before it returns), calling any other HSE functions
-// will result in undefined behavior. This function is not thread safe.
-func KvdbFini() {
-	C.hse_kvdb_fini()
-}
-
-// KvdbMake creates a new Kvdb instance within the named mpool
+// KvdbCreate creates a new Kvdb instance within the named mpool
 //
 // The mpool must already exist and the client must have permission to use the
 // mpool. This function is not thread safe.
-func KvdbMake(mpName string, params *Params) error {
-	var paramsC *C.struct_hse_params
-	if params != nil {
-		paramsC = params.impl
-	}
-
+func KvdbCreate(mpName string, params []string) error {
 	mpNameC := C.CString(mpName)
 	defer C.free(unsafe.Pointer(mpNameC))
 
-	err := C.hse_kvdb_make(mpNameC, paramsC)
+	cparams := newCParams(params)
+	defer cparams.free()
+
+	err := C.hse_kvdb_create(mpNameC, cparams.Len(), cparams.Ptr())
 	if err != 0 {
 		return hseErrToErrno(err)
 	}
@@ -87,18 +67,16 @@ func KvdbMake(mpName string, params *Params) error {
 //
 // The KVDB must already exist and the client must have permission to use it.
 // This function is not thread safe.
-func KvdbOpen(mpName string, params *Params) (*Kvdb, error) {
-	var paramsC *C.struct_hse_params
-	if params != nil {
-		paramsC = params.impl
-	}
-
+func KvdbOpen(mpName string, params []string) (*Kvdb, error) {
 	mpNameC := C.CString(mpName)
 	defer C.free(unsafe.Pointer(mpNameC))
 
+	cparams := newCParams(params)
+	defer cparams.free()
+
 	var kvdb Kvdb
 
-	err := C.hse_kvdb_open(mpNameC, paramsC, &kvdb.impl)
+	err := C.hse_kvdb_open(mpNameC, cparams.Len(), cparams.Ptr(), &kvdb.impl)
 	if err != 0 {
 		return nil, hseErrToErrno(err)
 	}
@@ -132,16 +110,14 @@ func (k *Kvdb) Close() error {
 // functions below. Otherwise the param should be set to 0 (the default). An
 // error will result if there is already a KVS with the given name. This
 // function is not thread safe.
-func (k *Kvdb) KvsMake(kvsName string, params *Params) error {
-	var paramsC *C.struct_hse_params
-	if params != nil {
-		paramsC = params.impl
-	}
-
+func (k *Kvdb) KvsMake(kvsName string, params []string) error {
 	kvsNameC := C.CString(kvsName)
 	defer C.free(unsafe.Pointer(kvsNameC))
 
-	err := C.hse_kvdb_kvs_make(k.impl, kvsNameC, paramsC)
+	cparams := newCParams(params)
+	defer cparams.free()
+
+	err := C.hse_kvdb_kvs_create(k.impl, kvsNameC, cparams.Len(), cparams.Ptr())
 	if err != 0 {
 		return hseErrToErrno(err)
 	}
@@ -168,18 +144,16 @@ func (k *Kvdb) KvsDrop(kvsName string) error {
 // KvsOpen opens a Kvs in a Kvdb
 //
 // This function is not thread safe.
-func (k *Kvdb) KvsOpen(kvsName string, params *Params) (*Kvs, error) {
-	var paramsC *C.struct_hse_params
-	if params != nil {
-		paramsC = params.impl
-	}
-
+func (k *Kvdb) KvsOpen(kvsName string, params []string) (*Kvs, error) {
 	kvsNameC := C.CString(kvsName)
 	defer C.free(unsafe.Pointer(kvsNameC))
 
+	cparams := newCParams(params)
+	defer cparams.free()
+
 	var kvs Kvs
 
-	err := C.hse_kvdb_kvs_open(k.impl, kvsNameC, paramsC, &kvs.impl)
+	err := C.hse_kvdb_kvs_open(k.impl, kvsNameC, cparams.Len(), cparams.Ptr(), &kvs.impl)
 	if err != 0 {
 		return nil, hseErrToErrno(err)
 	}
@@ -189,10 +163,10 @@ func (k *Kvdb) KvsOpen(kvsName string, params *Params) (*Kvs, error) {
 
 // Names returns the Kvs names within a Kvdb
 func (k *Kvdb) Names() ([]string, error) {
-	var namesc C.uint
+	var namesc C.size_t
 	var namesv **C.char
 
-	err := C.hse_kvdb_get_names(k.impl, &namesc, &namesv)
+	err := C.hse_kvdb_kvs_names_get(k.impl, &namesc, &namesv)
 	if err != 0 {
 		return nil, hseErrToErrno(err)
 	}
@@ -202,7 +176,7 @@ func (k *Kvdb) Names() ([]string, error) {
 		names[i] = C.GoString(s)
 	}
 
-	C.hse_kvdb_free_names(k.impl, namesv)
+	C.hse_kvdb_kvs_names_free(k.impl, namesv)
 
 	return names, nil
 }
@@ -226,17 +200,7 @@ func (k *Kvdb) NewTransaction() *Transaction {
 // Sync flushes data in all of the referenced KVDB's KVSs to stable media and
 // returns
 func (k *Kvdb) Sync() error {
-	err := C.hse_kvdb_sync(k.impl)
-	if err != 0 {
-		return hseErrToErrno(err)
-	}
-
-	return nil
-}
-
-// Flush initiates a data flush in all of the referenced Kvdb's Kvss
-func (k *Kvdb) Flush() error {
-	err := C.hse_kvdb_flush(k.impl)
+	err := C.hse_kvdb_sync(k.impl, 0)
 	if err != 0 {
 		return hseErrToErrno(err)
 	}
@@ -260,7 +224,7 @@ func (k *Kvdb) Flush() error {
 //
 // See the function Kvdb.CompactStatus(). This function is thread safe.
 func (k *Kvdb) Compact(flags KvdbCompactFlag) error {
-	err := C.hse_kvdb_compact(k.impl, C.int(flags))
+	err := C.hse_kvdb_compact(k.impl, C.uint(flags))
 	if err != 0 {
 		return hseErrToErrno(err)
 	}

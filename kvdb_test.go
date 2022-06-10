@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2020 Micron Technology, Inc. All rights reserved.
+// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
 
 package hse
 
@@ -39,8 +39,8 @@ func makeAndOpenKvs(kvsName string, p *Params) (k *Kvs) {
 }
 
 func TestMain(t *testing.M) {
-	KvdbInit()
-	defer KvdbFini()
+	Init()
+	defer Fini()
 
 	p, err := NewParams()
 	if err != nil {

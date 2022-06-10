@@ -1,7 +1,14 @@
 project(
     'hse-go',
-    version: '1.0.0',
-    meson_version: '>=0.57.0',
+    version: '2.2.0',
+    meson_version: '>=0.58.0',
+    default_options: [
+        'prefix=/opt/hse',
+        'c_std=gnu11', # necessary until Meson 0.63.0
+        'buildtype=debugoptimized',
+        'warning_level=2',
+        'force_fallback_for=xxhash,lz4,cjson',
+    ]
 )
 
 version_components = meson.project_version().split('.')
@@ -15,46 +22,37 @@ fs = import('fs')
 go = find_program('go', required: true)
 
 hse_dep = dependency(
-    'hse-1',
-    version: '>=1.10.0',
-    required: false,
+    'hse-2',
+    version: '>=2.2.0',
+    required: false
 )
 
 depends = []
 cgo_env = environment()
 
-if get_option('hse-include-dir') != '' or get_option('hse-lib-dir') != ''
-    if get_option('hse-include-dir') != ''
-        cgo_env.set('CGO_CFLAGS', '-I@0@'.format(get_option('hse-include-dir')))
-    endif
-    if get_option('hse-lib-dir') != ''
-        cgo_env.set('CGO_LDFLAGS', '-L@0@'.format(get_option('hse-lib-dir')))
-    endif
+if not hse_dep.found()
+    hse_proj = subproject(
+        'hse',
+        default_options: [
+            'cli=false',
+            'docs=disabled',
+            'tests=false',
+            'tools=disabled',
+            'samples=false',
+            'bindings=none',
+            'db_bench=false',
+        ]
+    )
+    hse_dep = hse_proj.get_variable('hse_dep')
+
+    depends += hse_proj.get_variable('hse')
+
+    cgo_env.set('CGO_CFLAGS', '-I@0@ -I@1@'.format(hse_dep.get_variable('includedir'), meson.global_build_root() / 'subprojects/hse/include'))
 else
-    if hse_dep.found()
-        cgo_env.set('CGO_CFLAGS', '-I@0@'.format(hse_dep.get_variable(pkgconfig: 'includedir')))
-        cgo_env.set('CGO_LDFLAGS', '-L@0@'.format(hse_dep.get_variable(pkgconfig: 'libdir')))
-    else
-        hse_proj = subproject(
-            'hse',
-            default_options: [
-                'buildtype=release',
-                'cli=false',
-                'samples=false',
-                'tests=false',
-                'tools=false',
-                'bindings-python=false',
-            ],
-        )
-        hse = hse_proj.get_variable('hse')
-        hse_dep = hse_proj.get_variable('hse_dep')
-
-        depends += hse
-
-        cgo_env.set('CGO_CFLAGS', '-I@0@'.format(hse_dep.get_variable(internal: 'source-root') / 'include'))
-        cgo_env.set('CGO_LDFLAGS', '-lhse-1 -L@0@'.format(fs.parent(hse.full_path())))
-    endif
+    cgo_env.set('CGO_CFLAGS', '-I' + hse_dep.get_variable('includedir'))
 endif
+
+cgo_env.set('CGO_LDFLAGS', '-l hse-@0@ -L@1@'.format(hse_go_major_version, hse_dep.get_variable('libdir')))
 
 hse_go = custom_target(
     'build',
@@ -66,26 +64,25 @@ hse_go = custom_target(
         '@OUTPUT@',
         '@SOURCE_ROOT@',
     ],
-    output: 'hse-go.ar'.format(hse_go_major_version),
+    output: 'hse-go.ar',
     depends: depends,
     depend_files: files(
         'cursor.go',
+        'hse.go',
         'kvdb.go',
         'kvs.go',
-        'params.go',
         'transaction.go',
         'experimental' / 'kvdb.go',
         'experimental' / 'kvs.go',
-        'experimental' / 'params.go',
         'limits' / 'limits.go',
     ),
-    env: cgo_env,
+    env: cgo_env
 )
 
 if get_option('tests')
     # Set LD_LIBRARY_PATH so that at runtime of the tests, the hse library is
     # found.
-    cgo_env.set('LD_LIBRARY_PATH', hse_dep.get_variable(internal: 'build-root') / 'lib')
+    cgo_env.set('LD_LIBRARY_PATH', hse_dep.get_variable('libdir'))
 
     # Go testing is stupid, and if I don't run the tests with ./..., I need to
     # import github.com/hse-project/hse-go, and then I end up with an import

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2020 Micron Technology, Inc. All rights reserved.
+// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
 
 package hse
 
@@ -19,15 +19,18 @@ type Cursor struct {
 	eof  bool
 }
 
-type CursorOptions struct {
-	Reverse    bool
-	StaticView bool
-	BindTxn    bool
-	Txn        *Transaction
-}
+type CursorCreateFlag uint
+type CursorReadFlags uint
+type CursorSeekFlags uint
+type CursorSeekRangeFlags uint
+type CursorUpdateViewFlags uint
 
-func (c *Cursor) Update(options *CursorOptions) error {
-	err := C.hse_kvs_cursor_update(c.impl, nil)
+const (
+	CURSOR_CREATE_REV CursorCreateFlag = C.HSE_CURSOR_CREATE_REV
+)
+
+func (c *Cursor) UpdateView(flags CursorUpdateViewFlags) error {
+	err := C.hse_kvs_cursor_update_view(c.impl, C.uint(flags))
 	if err != 0 {
 		return hseErrToErrno(err)
 	}
@@ -35,7 +38,7 @@ func (c *Cursor) Update(options *CursorOptions) error {
 	return nil
 }
 
-func (c *Cursor) Seek(key []byte) ([]byte, error) {
+func (c *Cursor) Seek(key []byte, flags CursorSeekFlags) ([]byte, error) {
 	var keyPtr unsafe.Pointer
 	var found unsafe.Pointer
 	var foundLen C.size_t
@@ -44,7 +47,7 @@ func (c *Cursor) Seek(key []byte) ([]byte, error) {
 		keyPtr = unsafe.Pointer(&key[0])
 	}
 
-	err := C.hse_kvs_cursor_seek(c.impl, nil, keyPtr, C.size_t(len(key)), &found, &foundLen)
+	err := C.hse_kvs_cursor_seek(c.impl, C.uint(flags), keyPtr, C.size_t(len(key)), &found, &foundLen)
 	if err != 0 {
 		return nil, hseErrToErrno(err)
 	}
@@ -56,7 +59,7 @@ func (c *Cursor) Seek(key []byte) ([]byte, error) {
 	return (*[limits.KvsVLenMax]byte)(found)[:foundLen:foundLen], nil
 }
 
-func (c *Cursor) SeekRange(filtMin []byte, filtMax []byte) ([]byte, error) {
+func (c *Cursor) SeekRange(filtMin []byte, filtMax []byte, flags CursorSeekRangeFlags) ([]byte, error) {
 	var filtMinPtr unsafe.Pointer
 	var filtMaxPtr unsafe.Pointer
 	var found unsafe.Pointer
@@ -69,7 +72,7 @@ func (c *Cursor) SeekRange(filtMin []byte, filtMax []byte) ([]byte, error) {
 		filtMaxPtr = unsafe.Pointer(&filtMax[0])
 	}
 
-	err := C.hse_kvs_cursor_seek_range(c.impl, nil, filtMinPtr, C.size_t(len(filtMin)), filtMaxPtr, C.size_t(len(filtMax)), &found, &foundLen)
+	err := C.hse_kvs_cursor_seek_range(c.impl, C.uint(flags), filtMinPtr, C.size_t(len(filtMin)), filtMaxPtr, C.size_t(len(filtMax)), &found, &foundLen)
 	if err != 0 {
 		return nil, hseErrToErrno(err)
 	}
@@ -81,14 +84,14 @@ func (c *Cursor) SeekRange(filtMin []byte, filtMax []byte) ([]byte, error) {
 	return (*[limits.KvsVLenMax]byte)(found)[:foundLen:foundLen], nil
 }
 
-func (c *Cursor) Read() ([]byte, []byte, error) {
+func (c *Cursor) Read(flags CursorReadFlags) ([]byte, []byte, error) {
 	var keyPtr unsafe.Pointer
 	var keyLen C.size_t
 	var valuePtr unsafe.Pointer
 	var valueLen C.size_t
 	var eof C.bool
 
-	err := C.hse_kvs_cursor_read(c.impl, nil, &keyPtr, &keyLen, &valuePtr, &valueLen, &eof)
+	err := C.hse_kvs_cursor_read(c.impl, C.uint(flags), &keyPtr, &keyLen, &valuePtr, &valueLen, &eof)
 	if err != 0 {
 		return nil, nil, hseErrToErrno(err)
 	}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copyright (C) 2020 Micron Technology, Inc. All rights reserved.
+// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
 
 package hse
 
@@ -133,5 +133,5 @@ func (t *Transaction) Abort() error {
 //
 // This function is thread safe with different transactions.
 func (t *Transaction) State() TransactionState {
-	return TransactionState(C.hse_kvdb_txn_get_state(t.kvdb.impl, t.impl))
+	return TransactionState(C.hse_kvdb_txn_state_get(t.kvdb.impl, t.impl))
 }

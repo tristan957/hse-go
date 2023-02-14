@@ -1,32 +1,31 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
+/* SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+ */
 
 package hse
 
-/*
-#include <hse/hse.h>
-*/
+// #include <hse/hse.h>
 import "C"
 import (
 	"syscall"
 	"unsafe"
 )
 
-// VersionString is a string representing the HSE version.
-var VersionString string
+// VERSION_STRING is a string representing the HSE version.
+var VERSION_STRING string
 
 const (
-	// VersionMajor is the major version of HSE.
-	VersionMajor uint = C.HSE_VERSION_MAJOR
-	// VersionMinor is the minor version of HSE.
-	VersionMinor uint = C.HSE_VERSION_MINOR
-	// VersionPatch is the Patch version of HSE.
-	VersionPatch uint = C.HSE_VERSION_PATCH
+	// VERSION_MAJOR is the major version of HSE.
+	VERSION_MAJOR uint = C.HSE_VERSION_MAJOR
+	// VERSION_MINOR is the minor version of HSE.
+	VERSION_MINOR uint = C.HSE_VERSION_MINOR
+	// VERSION_PATCH is the Patch version of HSE.
+	VERSION_PATCH uint = C.HSE_VERSION_PATCH
 )
 
 func init() {
-	VersionString = C.GoString(C.CString(C.HSE_VERSION_STRING))
+	VERSION_STRING = C.GoString(C.CString(C.HSE_VERSION_STRING))
 }
 
 type cparams struct {
@@ -89,7 +88,21 @@ func hseErrToErrno(err C.ulong) error {
 // This function initializes a range of different internal HSE structures. It
 // must be called before any other HSE functions are used. It is not thread safe
 // and is idempotent.
-func Init(config string, params []string) error {
+func Init(params ...string) error {
+	cparams := newCParams(params)
+	defer cparams.free()
+
+	err := C.hse_init(nil, cparams.Len(), cparams.Ptr())
+
+	return hseErrToErrno(err)
+}
+
+// Init initializes the HSE KVDB subsystem
+//
+// This function initializes a range of different internal HSE structures. It
+// must be called before any other HSE functions are used. It is not thread safe
+// and is idempotent.
+func InitWithConfig(config string, params []string) error {
 	configC := C.CString(config)
 	defer C.free(unsafe.Pointer(configC))
 

@@ -1,12 +1,11 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
+/* SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+ */
 
 package hse
 
-/*
-#include <hse/hse.h>
-*/
+// #include <hse/hse.h>
 import "C"
 import (
 	"unsafe"
@@ -24,7 +23,7 @@ type GetFlags uint
 type PrefixDeleteFlags uint
 type PutFlags uint
 
-var (
+const (
 	KVS_PUT_PRIO      PutFlags = C.HSE_KVS_PUT_PRIO
 	KVS_PUT_VCOMP_OFF PutFlags = C.HSE_KVS_PUT_VCOMP_OFF
 )
@@ -99,7 +98,7 @@ func (k *Kvs) Get(key []byte, flags GetFlags) ([]byte, uint, error) {
 		keyPtr = unsafe.Pointer(&key[0])
 	}
 
-	buf = make([]byte, limits.KvsVLenMax)
+	buf = make([]byte, limits.KVS_VALUE_LEN_MAX)
 	if buf != nil {
 		bufPtr = unsafe.Pointer(&buf[0])
 	}
@@ -186,15 +185,19 @@ func (k *Kvs) PrefixDelete(filt []byte, flags PrefixDeleteFlags) error {
 // same as passing an initialized but otherwise unmodified opspec.
 //
 //   - To create a cursor of type (1):
-//       - Pass either a NULL for opspec, or
-//       - Pass an initialized opspec with kop_txn == NULL
+//
+//   - Pass either a NULL for opspec, or
+//
+//   - Pass an initialized opspec with kop_txn == NULL
 //
 //   - To create a cursor of type (2):
-//       - Pass an initialized opspec with kop_txn == <target txn>
+//
+//   - Pass an initialized opspec with kop_txn == <target txn>
 //
 //   - To create a cursor of type (3):
-//       - Pass an initialized opspec with kop_txn == <target txn> and
-//         a kop_flags value with position HSE_KVDB_KOP_FLAG_BIND_TXN set
+//
+//   - Pass an initialized opspec with kop_txn == <target txn> and
+//     a kop_flags value with position HSE_KVDB_KOP_FLAG_BIND_TXN set
 //
 // The primary utility of the prefix filter mechanism is to maximize the efficiency of
 // cursor iteration on a KVS with multi-segment keys. For that use case, the caller

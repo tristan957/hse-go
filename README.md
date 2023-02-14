@@ -1,3 +1,9 @@
+<!--
+SPDX-License-Identifier: Apache-2.0 OR MIT
+
+SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+-->
+
 # HSE Go Bindings
 
 [Heterogeneous-Memory Storage Engine](https://github.com/hse-project/hse)

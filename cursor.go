@@ -1,12 +1,11 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
+/* SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+ */
 
 package hse
 
-/*
-#include <hse/hse.h>
-*/
+// #include <hse/hse.h>
 import "C"
 import (
 	"unsafe"
@@ -56,7 +55,7 @@ func (c *Cursor) Seek(key []byte, flags CursorSeekFlags) ([]byte, error) {
 		return nil, nil
 	}
 
-	return (*[limits.KvsVLenMax]byte)(found)[:foundLen:foundLen], nil
+	return (*[limits.KVS_VALUE_LEN_MAX]byte)(found)[:foundLen:foundLen], nil
 }
 
 func (c *Cursor) SeekRange(filtMin []byte, filtMax []byte, flags CursorSeekRangeFlags) ([]byte, error) {
@@ -81,7 +80,7 @@ func (c *Cursor) SeekRange(filtMin []byte, filtMax []byte, flags CursorSeekRange
 		return nil, nil
 	}
 
-	return (*[limits.KvsVLenMax]byte)(found)[:foundLen:foundLen], nil
+	return (*[limits.KVS_VALUE_LEN_MAX]byte)(found)[:foundLen:foundLen], nil
 }
 
 func (c *Cursor) Read(flags CursorReadFlags) ([]byte, []byte, error) {
@@ -100,10 +99,10 @@ func (c *Cursor) Read(flags CursorReadFlags) ([]byte, []byte, error) {
 	var value []byte
 
 	if keyPtr != nil {
-		key = (*[limits.KvsKLenMax]byte)(keyPtr)[:keyLen:keyLen]
+		key = (*[limits.KVS_VALUE_LEN_MAX]byte)(keyPtr)[:keyLen:keyLen]
 	}
 	if valuePtr != nil {
-		value = (*[limits.KvsVLenMax]byte)(valuePtr)[:valueLen:valueLen]
+		value = (*[limits.KVS_VALUE_LEN_MAX]byte)(valuePtr)[:valueLen:valueLen]
 	}
 
 	c.eof = bool(eof)

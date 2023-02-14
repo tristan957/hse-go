@@ -1,12 +1,11 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
+/* SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+ */
 
 package hse
 
-/*
-#include <hse/hse.h>
-*/
+// #include <hse/hse.h>
 import "C"
 
 // TransactionState represents the states a transaction can exist in
@@ -44,17 +43,17 @@ const (
 //
 // The general lifecycle of a transaction is as follows:
 //
-//                       +----------+
-//                       | INVALID  |
-//                       +----------+
-//                             |
-//                             v
-//                       +----------+
-//     +---------------->|  ACTIVE  |<----------------+
-//     |                 +----------+                 |
-//     |  +-----------+    |      |     +----------+  |
-//     +--| COMMITTED |<---+      +---->| ABORTED  |--+
-//        +-----------+                 +----------+
+//	                  +----------+
+//	                  | INVALID  |
+//	                  +----------+
+//	                        |
+//	                        v
+//	                  +----------+
+//	+---------------->|  ACTIVE  |<----------------+
+//	|                 +----------+                 |
+//	|  +-----------+    |      |     +----------+  |
+//	+--| COMMITTED |<---+      +---->| ABORTED  |--+
+//	   +-----------+                 +----------+
 //
 // When a transaction is initially allocated, it starts in the INVALID state.
 // When Transaction.Begin() is called with transaction in the INVALID,

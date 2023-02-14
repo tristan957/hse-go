@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
+/* SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+ */
 
 package hse
 
@@ -17,7 +18,7 @@ var cursorTestKvs *Kvs
 
 func resetCursorTestKvs() {
 	for i := 1; i <= 5; i++ {
-		cursorTestKvs.Put([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)), nil)
+		cursorTestKvs.Put([]byte(fmt.Sprintf("key%d", i)), []byte(fmt.Sprintf("value%d", i)), 0)
 	}
 }
 
@@ -25,13 +26,13 @@ func TestSeek(t *testing.T) {
 	testSeek := func(filter []byte) {
 		resetCursorTestKvs()
 
-		c, err := cursorTestKvs.NewCursor(filter, nil)
+		c, err := cursorTestKvs.CreateCursor(filter, 0)
 		if err != nil {
 			t.Fatalf("failed to create cursor: %s", err)
 		}
 		defer c.Destroy()
 
-		found, err := c.Seek([]byte("key3"))
+		found, err := c.Seek([]byte("key3"), 0)
 		if err != nil {
 			t.Fatalf("failed to seek to key3: %s", err)
 		}
@@ -39,7 +40,7 @@ func TestSeek(t *testing.T) {
 			t.Fatal("found key after seek is not key3")
 		}
 
-		key, value, err := c.Read()
+		key, value, err := c.Read(0)
 		if err != nil {
 			t.Fatalf("failed to read cursor: %s", err)
 		}
@@ -47,9 +48,9 @@ func TestSeek(t *testing.T) {
 			t.Fatalf("unexpected key/value pair from read, expected (key3, value3), got (%s, %s)", string(key), string(value))
 		}
 
-		c.Read()
-		c.Read()
-		_, _, err = c.Read()
+		c.Read(0)
+		c.Read(0)
+		_, _, err = c.Read(0)
 		if err != nil {
 			t.Fatalf("failed to reach end of file: %s", err)
 		}
@@ -70,13 +71,13 @@ func TestSeekRange(t *testing.T) {
 	testSeekRange := func(filter []byte) {
 		resetCursorTestKvs()
 
-		c, err := cursorTestKvs.NewCursor(filter, nil)
+		c, err := cursorTestKvs.CreateCursor(filter, 0)
 		if err != nil {
 			t.Fatalf("failed to create cursor: %s", err)
 		}
 		defer c.Destroy()
 
-		found, err := c.SeekRange([]byte("key0"), []byte("key3"))
+		found, err := c.SeekRange([]byte("key0"), []byte("key3"), 0)
 		if err != nil {
 			t.Fatalf("failed to seek range: %s", err)
 		}
@@ -84,7 +85,7 @@ func TestSeekRange(t *testing.T) {
 			t.Fatal("found key after seek range is not key0")
 		}
 
-		key, value, err := c.Read()
+		key, value, err := c.Read(0)
 		if err != nil {
 			t.Fatalf("failed to read cursor: %s", err)
 		}
@@ -92,16 +93,16 @@ func TestSeekRange(t *testing.T) {
 			t.Fatalf("unexpected key/value pair from read, expected (key0, value0), got (%s, %s)", string(key), string(value))
 		}
 
-		c.Read()
-		c.Read()
-		key, value, err = c.Read()
+		c.Read(0)
+		c.Read(0)
+		key, value, err = c.Read(0)
 		if err != nil {
 			t.Fatalf("failed to read cursor: %s", err)
 		}
 		if string(key) != "key3" || string(value) != "value3" {
 			t.Fatalf("unexpected key/value pair from read, expected (key3, value3), got (%s, %s)", string(key), string(value))
 		}
-		c.Read()
+		c.Read(0)
 		if !c.Eof() {
 			t.Fatal("failed to reach end of file")
 		}
@@ -118,16 +119,16 @@ func TestSeekRange(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	resetCursorTestKvs()
 
-	c, err := cursorTestKvs.NewCursor(nil, nil)
+	c, err := cursorTestKvs.CreateCursor(nil, 0)
 	if err != nil {
 		t.Fatalf("failed to create cursor: %s", err)
 	}
 	defer c.Destroy()
 
-	cursorTestKvs.Put([]byte("key6"), []byte("value6"), nil)
+	cursorTestKvs.Put([]byte("key6"), []byte("value6"), 0)
 
 	for i := 0; ; i++ {
-		_, _, err = c.Read()
+		_, _, err = c.Read(0)
 		if err != nil {
 			t.Fatalf("failed to read from cursor: %s", err)
 		}
@@ -136,11 +137,11 @@ func TestUpdate(t *testing.T) {
 		}
 	}
 
-	if err = c.Update(nil); err != nil {
+	if err = c.UpdateView(0); err != nil {
 		t.Fatalf("failed to update cursor: %s", err)
 	}
 
-	key, value, err := c.Read()
+	key, value, err := c.Read(0)
 	if err != nil {
 		t.Fatalf("failed to read cursor: %s", err)
 	}
@@ -156,13 +157,13 @@ func TestUpdate(t *testing.T) {
 func TestReverse(t *testing.T) {
 	resetCursorTestKvs()
 
-	c, err := cursorTestKvs.NewCursor(nil, &CursorOptions{Reverse: true})
+	c, err := cursorTestKvs.CreateCursor(nil, CURSOR_CREATE_REV)
 	if err != nil {
 		t.Fatalf("failed to create cursor: %s", err)
 	}
 
 	for i := 4; i >= 0; i-- {
-		key, value, err := c.Read()
+		key, value, err := c.Read(0)
 		if err != nil {
 			t.Fatalf("failed to read cursor: %s", err)
 		}
@@ -177,7 +178,7 @@ func TestType2(t *testing.T) {
 
 	txn := kvdb.NewTransaction()
 
-	cursorTestKvs.Put([]byte("key5"), []byte("value5"), nil)
+	cursorTestKvs.Put([]byte("key5"), []byte("value5"), 0)
 	cursorTestKvs.Put([]byte("key6"), []byte("value6"), &PutOptions{Txn: txn})
 
 	c, err := cursorTestKvs.NewCursor(nil, &CursorOptions{Txn: txn})
@@ -199,21 +200,21 @@ func TestUpdateToType2(t *testing.T) {
 
 	txn := kvdb.NewTransaction()
 
-	cursorTestKvs.Put([]byte("key5"), []byte("value5"), nil)
+	cursorTestKvs.Put([]byte("key5"), []byte("value5"), 0)
 	cursorTestKvs.Put([]byte("key6"), []byte("value6"), &PutOptions{Txn: txn})
 
-	c, err := cursorTestKvs.NewCursor(nil, nil)
+	c, err := cursorTestKvs.CreateCursor(nil, 0)
 	if err != nil {
 		t.Fatalf("failed to create cursor: %s", err)
 	}
-	if err = c.Update(&CursorOptions{Txn: txn}); err != nil {
+	if err = c.UpdateView(0); err != nil {
 		t.Fatalf("failed to update cursor: %s", err)
 	}
 
 	for i := 0; i < 5; i++ {
-		c.Read()
+		c.Read(0)
 	}
-	c.Read()
+	c.Read(0)
 	if !c.Eof() {
 		t.Fatal("failed to reach end of file")
 	}
@@ -224,18 +225,18 @@ func TestType3(t *testing.T) {
 
 	txn := kvdb.NewTransaction()
 
-	cursorTestKvs.Put([]byte("key5"), []byte("value5"), nil)
+	cursorTestKvs.Put([]byte("key5"), []byte("value5"), 0)
 	cursorTestKvs.Put([]byte("key6"), []byte("value6"), &PutOptions{Txn: txn})
 
-	c, err := cursorTestKvs.NewCursor(nil, &CursorOptions{BindTxn: true, Txn: txn})
+	c, err := cursorTestKvs.CreateCursor(nil, &CursorOptions{BindTxn: true, Txn: txn})
 	if err != nil {
 		t.Fatalf("failed to create cursor: %s", err)
 	}
 
 	for i := 0; i < 5; i++ {
-		c.Read()
+		c.Read(0)
 	}
-	key, value, err := c.Read()
+	key, value, err := c.Read(0)
 	if err != nil {
 		t.Fatalf("failed to read cursor: %s", err)
 	}
@@ -253,10 +254,10 @@ func TestUpdateToType3(t *testing.T) {
 
 	txn := kvdb.NewTransaction()
 
-	cursorTestKvs.Put([]byte("key5"), []byte("value5"), nil)
+	cursorTestKvs.Put([]byte("key5"), []byte("value5"), 0)
 	cursorTestKvs.Put([]byte("key6"), []byte("value6"), &PutOptions{Txn: txn})
 
-	c, err := cursorTestKvs.NewCursor(nil, nil)
+	c, err := cursorTestKvs.CreateCursor(nil, 0)
 	if err != nil {
 		t.Fatalf("failed to create cursor: %s", err)
 	}
@@ -265,9 +266,9 @@ func TestUpdateToType3(t *testing.T) {
 	}
 
 	for i := 0; i < 5; i++ {
-		c.Read()
+		c.Read(0)
 	}
-	key, value, err := c.Read()
+	key, value, err := c.Read(0)
 	if err != nil {
 		t.Fatalf("failed to read cursor: %s", err)
 	}

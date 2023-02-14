@@ -1,13 +1,12 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
+/* SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+ */
 
 package hse
 
-/*
-#include <hse/hse.h>
-#include <hse/experimental.h>
-*/
+// #include <hse/hse.h>
+// #include <hse/experimental.h>
 import "C"
 import (
 	"unsafe"
@@ -19,10 +18,11 @@ import (
 type KvdbCompactFlag uint
 
 const (
-	// CompactCancel will cancel a compaction
-	CompactCancel KvdbCompactFlag = 0x01
-	// CompactSampLwm will compact to the space amplification low watermark
-	CompactSampLwm KvdbCompactFlag = 0x02
+	// KVDB_COMPACT_CANCEL will cancel a compaction
+	KVDB_COMPACT_CANCEL KvdbCompactFlag = C.HSE_KVDB_COMPACT_CANCEL
+	// KVDB_COMPACT_SAMP_LWM will compact to the space amplification low watermark
+	KVDB_COMPACT_SAMP_LWM KvdbCompactFlag = C.HSE_KVDB_COMPACT_SAMP_LWM
+	KVDB_COMPACT_FULL     KvdbCompactFlag = C.HSE_KVDB_COMPACT_FULL
 )
 
 // Kvdb is a key-value database which is comprised of one or many Kvs
@@ -40,7 +40,7 @@ type KvdbCompactStatus struct {
 	SampCurr uint
 	// Active is whether an externally requested compaction is underway
 	Active bool
-	// Canceled is whether an externall requested compaction is canceled
+	// Canceled is whether an externally requested compaction is canceled
 	Canceled bool
 }
 
@@ -48,14 +48,14 @@ type KvdbCompactStatus struct {
 //
 // The mpool must already exist and the client must have permission to use the
 // mpool. This function is not thread safe.
-func KvdbCreate(mpName string, params []string) error {
-	mpNameC := C.CString(mpName)
-	defer C.free(unsafe.Pointer(mpNameC))
+func KvdbCreate(home string, params ...string) error {
+	homeC := C.CString(home)
+	defer C.free(unsafe.Pointer(homeC))
 
 	cparams := newCParams(params)
 	defer cparams.free()
 
-	err := C.hse_kvdb_create(mpNameC, cparams.Len(), cparams.Ptr())
+	err := C.hse_kvdb_create(homeC, cparams.Len(), cparams.Ptr())
 	if err != 0 {
 		return hseErrToErrno(err)
 	}
@@ -67,16 +67,16 @@ func KvdbCreate(mpName string, params []string) error {
 //
 // The KVDB must already exist and the client must have permission to use it.
 // This function is not thread safe.
-func KvdbOpen(mpName string, params []string) (*Kvdb, error) {
-	mpNameC := C.CString(mpName)
-	defer C.free(unsafe.Pointer(mpNameC))
+func KvdbOpen(home string, params []string) (*Kvdb, error) {
+	homeC := C.CString(home)
+	defer C.free(unsafe.Pointer(homeC))
 
 	cparams := newCParams(params)
 	defer cparams.free()
 
 	var kvdb Kvdb
 
-	err := C.hse_kvdb_open(mpNameC, cparams.Len(), cparams.Ptr(), &kvdb.impl)
+	err := C.hse_kvdb_open(homeC, cparams.Len(), cparams.Ptr(), &kvdb.impl)
 	if err != 0 {
 		return nil, hseErrToErrno(err)
 	}
@@ -103,14 +103,14 @@ func (k *Kvdb) Close() error {
 	return nil
 }
 
-// KvsMake creates a new Kvs within the referenced Kvdb
+// KvsCreate creates a new Kvs within the referenced Kvdb
 //
 // If the KVS will store multi-segment keys then the parameter "pfx_len" should
 // be set to the desired key prefix length - see Params.Set() and related
 // functions below. Otherwise the param should be set to 0 (the default). An
 // error will result if there is already a KVS with the given name. This
 // function is not thread safe.
-func (k *Kvdb) KvsMake(kvsName string, params []string) error {
+func (k *Kvdb) KvsCreate(kvsName string, params ...string) error {
 	kvsNameC := C.CString(kvsName)
 	defer C.free(unsafe.Pointer(kvsNameC))
 
@@ -144,7 +144,7 @@ func (k *Kvdb) KvsDrop(kvsName string) error {
 // KvsOpen opens a Kvs in a Kvdb
 //
 // This function is not thread safe.
-func (k *Kvdb) KvsOpen(kvsName string, params []string) (*Kvs, error) {
+func (k *Kvdb) KvsOpen(kvsName string, params ...string) (*Kvs, error) {
 	kvsNameC := C.CString(kvsName)
 	defer C.free(unsafe.Pointer(kvsNameC))
 
@@ -162,7 +162,7 @@ func (k *Kvdb) KvsOpen(kvsName string, params []string) (*Kvs, error) {
 }
 
 // Names returns the Kvs names within a Kvdb
-func (k *Kvdb) Names() ([]string, error) {
+func (k *Kvdb) KvsNames() ([]string, error) {
 	var namesc C.size_t
 	var namesv **C.char
 
@@ -172,7 +172,7 @@ func (k *Kvdb) Names() ([]string, error) {
 	}
 
 	names := make([]string, namesc)
-	for i, s := range (*[limits.KvsCountMax]*C.char)(unsafe.Pointer(namesv))[:namesc:namesc] {
+	for i, s := range (*[limits.KVS_COUNT_MAX]*C.char)(unsafe.Pointer(namesv))[:namesc:namesc] {
 		names[i] = C.GoString(s)
 	}
 
@@ -216,11 +216,11 @@ func (k *Kvdb) Sync() error {
 // as it ever would be in normal operation. To achieve this, the client calls
 // this function in the following fashion:
 //
-//     kvdb.Compact(CompactSampLwm);
+//	kvdb.Compact(CompactSampLwm);
 //
 // To cancel an ongoing compaction request for a Kvdb:
 //
-//     kvdb.Compact(CompactCancel);
+//	kvdb.Compact(CompactCancel);
 //
 // See the function Kvdb.CompactStatus(). This function is thread safe.
 func (k *Kvdb) Compact(flags KvdbCompactFlag) error {

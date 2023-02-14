@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: Apache-2.0
-//
-// Copyright (C) 2022 Micron Technology, Inc. All rights reserved.
+/* SPDX-License-Identifier: Apache-2.0 OR MIT
+ *
+ * SPDX-FileCopyrightText: Copyright 2022 Micron Technology, Inc.
+ */
 
 package hse
 
@@ -19,17 +20,30 @@ const (
 var kvdb *Kvdb
 var kvdbTestKvs *Kvs
 
-func makeAndOpenKvs(kvsName string, p *Params) (k *Kvs) {
-	err := kvdb.KvsMake(kvsName, p)
+type params struct {
+	Cparams []string
+	Rparams []string
+}
+
+func (p *params) SetCparams(params ...string) {
+	p.Cparams = params
+}
+
+func (p *params) SetRparams(params ...string) {
+	p.Rparams = params
+}
+
+func makeAndOpenKvs(kvsName string, p params) (k *Kvs) {
+	err := kvdb.KvsCreate(kvsName, p.Cparams...)
 	if err != nil && err != syscall.EEXIST {
 		fmt.Fprintf(os.Stderr, "failed to make kvs: %s\n", err)
 		os.Exit(1)
 	}
 	if err == syscall.EEXIST {
 		kvdb.KvsDrop(kvsName)
-		kvdb.KvsMake(kvsName, p)
+		kvdb.KvsCreate(kvsName, p.Cparams...)
 	}
-	kvs, err := kvdb.KvsOpen(kvsName, p)
+	kvs, err := kvdb.KvsOpen(kvsName, p.Rparams...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to open kvs: %s\n", err)
 		os.Exit(1)
@@ -39,41 +53,37 @@ func makeAndOpenKvs(kvsName string, p *Params) (k *Kvs) {
 }
 
 func TestMain(t *testing.M) {
+	var kvsParams params
+
+	kvsParams.SetCparams("prefix.length=3")
+
 	Init()
 	defer Fini()
 
-	p, err := NewParams()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create params: %s\n", err)
-		os.Exit(1)
-	}
-
-	p.Set("kvs.pfx_len", "3")
-
-	if err := KvdbMake(kvdbName, nil); err != nil && err != syscall.EEXIST {
+	if err := KvdbCreate(kvdbName); err != nil && err != syscall.EEXIST {
 		fmt.Fprintf(os.Stderr, "failed to make kvdb: %s\n", err)
 		os.Exit(1)
 	}
-	kvdb, err = KvdbOpen(kvdbName, nil)
+	kvdb, err := KvdbOpen(kvdbName, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to open kvdb: %s\n", err)
 		os.Exit(1)
 	}
 	defer kvdb.Close()
 
-	kvdbTestKvs = makeAndOpenKvs(kvdbTestKvsName, p)
+	kvdbTestKvs = makeAndOpenKvs(kvdbTestKvsName, kvsParams)
 	defer kvdbTestKvs.Close()
 	defer kvdb.KvsDrop(kvsTestKvsName)
 
-	kvsTestKvs = makeAndOpenKvs(kvsTestKvsName, p)
+	kvsTestKvs = makeAndOpenKvs(kvsTestKvsName, kvsParams)
 	defer kvsTestKvs.Close()
 	defer kvdb.KvsDrop(kvsTestKvsName)
 
-	cursorTestKvs = makeAndOpenKvs(cursorTestKvsName, p)
+	cursorTestKvs = makeAndOpenKvs(cursorTestKvsName, kvsParams)
 	defer cursorTestKvs.Close()
 	defer kvdb.KvsDrop(cursorTestKvsName)
 
-	names, err := kvdb.Names()
+	names, err := kvdb.KvsNames()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to get kvs names: %s\n", err)
 	}
@@ -93,7 +103,7 @@ func TestSync(t *testing.T) {
 }
 
 func TestFlush(t *testing.T) {
-	if err := kvdb.Flush(); err != nil {
+	if err := kvdb.Sync(); err != nil {
 		t.Fatalf("failed to flush kvdb: %s", err)
 	}
 }
